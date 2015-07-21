@@ -1,0 +1,203 @@
+---
+title: "Introduction to coalescent simulation and ms"
+output: html_document
+---
+
+Before venturing into more advanced topics, let's make sure everyone has a working coalescent simulator installed, and take a few minutes to explore the ideas we just learned. Today we'll be working with the coalescent simulator *ms* from the command line. *ms* (Hudson 2002) is something of a gold standard against which new simulators are measured. It is efficient, fast, can handle a wide range of scenarios, is well documented, and it was one of the first. Documentation and source code for *ms* can be downloaded from http://home.uchicago.edu/rhudson1/source/mksamples.html.
+
+In this lab we will 
+
+- **Briefly review using the command line**
+- **Make sure everyone has a working copy of ms**
+- **Run a simple coalescent simulation and explore the output format**
+
+The command line
+----------------------------------------------------
+
+A large proportion of population genetics software is designed to be run from a linux command line. Before we begin working with *ms* we can review some commands that will likely be useful today. 
+
+---------------------------------------------------------------------------------------------------------
+Command             Usage                               Description
+--------------      ----------------------              -------------------------------------------------
+**cd**                cd [Directory]                    Changes your directory to the location given, 
+                                                         '..' can be used to move up a level 
+                                                         
+**ls**                ls or ls -l                       Shows all the files in the current directory,
+                                                        -l provides additional information about the files
+                                                         
+**head (tail)**       head --[&#35;lines] [Filename]    Print the first (last) lines of a file
+
+**more (less)**       more [Filename]                   Display contents of file and allow user to 
+                                                         scroll through, less is fancier version of 
+                                                         more with additional options
+                                                         
+**mv**                mv [Source] [Destination]         Moves a source file to the given destination,
+                                                         used to rename files
+                                                         
+**cp**                cp  [Filename]  [New Filename]    Copies an existing file to a new file
+
+**wc**                wc [Filename]                     Outputs &#35; lines, words, and characters
+                                                         in given file
+                                                         
+**grep**              grep 'string'                     Searches a file and prints every line
+                                                         that contains 'string'
+                                                         
+**rm**                rm [Filename]                     Deletes a file
+
+**mkdir**             mkdir [Directory]                 Creates a new directory in the current folder
+
+**pwd**               pwd                               Prints your current directory path
+---------------------------------------------------------------------------------------------------------
+
+The internet is full of helpful resources for all things linux, here is an expanded list of basic commands that might come in handy: http://mally.stanford.edu/~sr/computing/basic-unix.html
+
+Installing a local copy of *ms*
+------------------------------------------------------
+If you don't have access to a working copy of ms, it is an easy program to download and locally install
+
+```
+mkdir coalescent                                      # Make folder where we can install the program and run our simulations
+cd coalescent                                                                   # Enter the folder
+wget https://webshare.uchicago.edu/users/rhudson1/Public/ms.folder/ms.tar.gz    # Download the ms source code
+tar -xvf ms.tar.gz                                                              # Untar the program
+cd msdir                                                                        # Enter the folder with the source code
+gcc -o ms ms.c streec.c rand1.c -lm                                             # Compile the source code into an executable
+```
+
+There should now be an executable at ../coalescent/msdir/ms, to test if it is working run the command
+
+```
+./ms 
+```
+You should get a message beginning "Too few command line arguments" and then listing all the input options that *ms* recognizes. If you do not get this message, please speak up so we can troubleshoot.
+
+In addition to an executable, the downloaded files include the user guide. This can be viewed from the command line with
+```
+emacs msdoc.pdf
+```
+The user guide includes an extensive description of *ms* features, some detailed examples, and a table with a summary of all the recognized commands.
+
+Our first coalescent simulation
+-----------------------------------------------------
+Let's move out of the directory where we installed *ms* and create a folder where we can generate output.
+
+```
+cd ../
+mkdir output
+cd output
+```
+From here on, in the code snippets I will write only `ms`, however, in order to run the program you will need to call the executable from folder where you installed it. For example, if we are currently in `/home/myname/coalescent/output` and you've installed *ms* at `/home/myname/coalescent/msdir/ms` you will need to type either `./home/myname/coalescent/msdir/ms` or `../msdir/ms`. If you don't want to have to type that every time, you can run the command `alias ms=/path/to/ms/executable`, which will set up an alias that will allow you to run the program simply by typing `ms` at the command line.
+
+The most basic *ms* command line has the form
+
+```
+ms [#samples] [#repetitions] -t [theta];
+```
+
+where samples referes to the number of external nodes, repetitions is the number of independent genealogies to realize, and theta is the population mutation rate.
+
+The command
+```
+ms 5 2 -t 5
+```
+should generate give output similar to
+
+```
+/home/mreppell/Downloads/coalescent/msdir/ms 5 2 -t 5                  # Commands that generated the simulations 
+49185 51592 48399                                                      # Random number seed
+
+//                                                                     # Here is our first coalescent genealogy
+segsites: 7                                                            # Number of mutation events
+positions: 0.0461 0.0562 0.0960 0.4686 0.7269 0.9286 0.9457            # Mutation locations along haplotype
+1010001                                                               
+1001001                                                                # The five simulated haplotypes
+0100010                                                                # 0 = ancestral allele, 1 = derived allele
+1010001
+0000100
+
+//                                                                     # Our second realized genealogy
+segsites: 4
+positions: 0.0976 0.2346 0.6603 0.8261 
+0010
+0011
+1000
+0110
+0011
+```
+
+-------------------------------
+
+**Questions**  
+If we assume that the per base mutation rate is $1.5 \times 10^{-8}$ and we have a population of 20,000 haploids, how large is the locus we are simulating when we set $\theta=5$? How large would our population size be if we use the same mutation rate and $\theta$ but assume our locus is 2.5 kb?
+
+What are the possible genealogies that could have given rise to the haplotypes we observe in the second coalescent tree above?
+
+-------------------------------
+
+The output from a simulation can be saved by capturing it in a file
+```
+ms 10 10 -t 2.5 > ms_simulation.txt  # Record simulations in a .txt file
+head ms_simulation.txt               # Print the top lines of the simulations
+```
+
+If we are simulating thousands of samples, thousands of genealogies, or very long loci, files can become very large. Output can be compressed with `gzip` or `bgzip`, but even still it may be too large to reasonably store indefinitely. This is where the random seed can be very helpful. If you store only the top 2 lines of an *ms* simulation you can regenerate the rest of the data if/when it is needed. In the folder where we have been running *ms* there will be a file `seedms`, containing nothing but a random number seed. This is the seed for the next time *ms* is called, and by modifying it we can regenerate a previous simulation.
+
+```
+echo '49185 51592 48399' > seedms
+ms 5 2 -t 5
+```
+
+Should produce the exact output seen in the example above.
+
+There are two flags we can use on the command line to add to the output that *ms* provides. The first will allow us to check our answer to the second question above.
+
+```
+echo '49185 51592 48399' > seedms
+ms 5 2 -t 5 -T -L
+```
+
+adds two lines to our output. First, a line for the actual gene tree that gave rise to simulated haplotypes along with the coalescent times. The genealogy is given in Newick format, which is a standard format that can be input into a number of other programs. The second flag explicitly outputs two values we could calculate from the gene tree: TMRCA and $T_{total}$.
+
+**!!!NOTE - ms scales time in units of 4N instead of 2N!!!**
+
+
+```
+/home/mreppell/Downloads/coalescent/msdir/ms 5 2 -t 5 -T -L 
+49185 51592 48399
+
+//
+((2:0.230,(1:0.010,4:0.010):0.219):0.701,(3:0.258,5:0.258):0.672);   # The gene tree that gave rise to the following haplotypes
+time:  0.930374	2.358797                                             # TMRCA and T(total)
+segsites: 7
+positions: 0.0461 0.0562 0.0960 0.4686 0.7269 0.9286 0.9457 
+1010001
+1001001
+0100010
+1010001
+0000100
+
+//
+(3:0.558,((1:0.084,4:0.084):0.190,(2:0.108,5:0.108):0.167):0.284);
+time:	0.558367	1.583491
+segsites: 4
+positions: 0.0976 0.2346 0.6603 0.8261 
+0010
+0011
+1000
+0110
+0011
+```
+
+-------------------------------
+
+**Questions**  
+In the first tree above, if our locus is 8.33 kb, our per base mutation rate $1.5 \times 10^{-8}$, and our population size (2N) is 20,000 haploid members, how many generations ago was the MRCA of the entire sample?
+
+In the second tree above, it turns out we have missed a variant site. With your knowledge of the genealogy underlying the locus, which sample(s) are most likely to harbor the derived allele at the newly discovered site? The second most likely set of samples? 
+
+-------------------------------
+
+
+
+
+

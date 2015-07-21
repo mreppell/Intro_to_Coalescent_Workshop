@@ -1,0 +1,145 @@
+---
+title: "Calculating summaries of coalescent output"
+output: html_document
+---
+
+*ms* installations include a program entitled *sample_stats* that takes *ms* output and calculates several of the statistics we discussed in the previous lecture. In this lab we will 
+
+- **Compile and learn to run sample_stats**
+- **Use R to interpret results**
+- **Explore impact of population size/mutation rate on summary statistics**
+
+sample_stats
+---------------
+
+Source code for the program can be found and installed in the same directory as *ms*. If `/your_path/mddir/ms` is where you have the *ms* executable installed *sample_stats* can be installed by as `/your_path/msdir/sample_stats` using the following commands
+
+```
+cd /your_path/msdir/
+gcc -o sample_stats sample_stats.c tajd.c -lm
+```
+
+To run the program we "pipe" output directly from *ms* into *sample_stats*
+
+```
+ms 5 4 -t 4 | /your_path/msdir/sample_stats       #The "|" is the pipe symbol
+```
+When you run the previous command you should get output that looks like
+
+```
+pi:  4.400000	ss:	10	D:	-0.596333	thetaH:	5.600000	H:	-1.200000
+pi:	1.000000	ss:	2	D:	0.243139	thetaH:	1.000000	H:	0.000000
+pi:	0.000000	ss:	0	D:	0.000000	thetaH:	0.000000	H:	-0.000000
+pi:	1.600000	ss:	4	D:	-1.093799	thetaH:	1.900000	H:	-0.300000
+```
+
+-----------------------------------
+Value      Description
+---------- ------------------------
+pi          Pairwise sequence difference
+
+ss          Total number of segregating sites
+
+D           Tajima's D, standardized difference between pi and ss/a1, used to detect departures from neutrality
+
+thetaH      Fay and Wu's theta_H , another estimator of theta designed to be used in the next statistic
+
+H           Fay and Wu's H, standardized difference between pi and thetaH, used to detect signatures of positive selection
+-----------------------------------
+
+Usage instructions for *sample_stats* are included as the last section of the user's guide for *ms*.
+
+
+Exploring results in R
+----------------------
+
+Fortunately, *sample_stats* output is formatted in such a way that reading it into R does not require reformatting. Let's work with the same input
+
+```
+echo 57000 44400 6650 > seedms
+ms 100 100 -t 12 | sample_stats > sstat_output1.txt
+```
+Open an R session and read in the output.
+
+```{r}
+ourdata=read.table("sstat_output1.txt",head=F)
+hist(ourdata[,4],breaks=25,col="dodgerblue",main="Total number of segregating sites",xlab="Number of Segregating Sites")
+hist(ourdata[,6],breaks=25,col="red3",main="Tajima's D",xlab="Tajima's D",xlim=c(-3.25,3.25))
+abline(v=-2,lty=3)
+abline(v=2,lty=3)
+```
+
+**Questions**
+
+In the first plot above, the number of variants in our samples range from <40 to >115. What is the expected number of variants in this scenario?
+
+Using Tajima's D, for how many of our data sets would we reject the hypothesis that the data comes from a neutral model? How many of them were actually generated under a neutral model? Does this rejection rate seem reasonable?
+
+All the cases where we reject the neutral hypothesis have a D value greater than 2. Sample_stats does not output Watterson's estimator, but if we wanted to calculate it from the given data, could we? Without doing any calculations, what can we say about the value of Watterson's estimator for each of the cases where we would reject the neutral hypothesis?
+
+----------------------------------
+
+Let's create a second data set for comparison.
+```
+echo 57001 44400 6650 > seedms
+ms 100 100 -t 24 | sample_stats > sstat_output2.txt
+```
+
+```{r fig.width=11.25}
+ourdata2=read.table("sstat_output2.txt",head=F)
+par(mfrow=c(1,3))
+hist(ourdata[,2],breaks=seq(0,70,by=5),col=rgb(1,0,0,0.5),main="",xlab="Pi",xlim=c(-1,70),cex.axis=1.75,cex.lab=1.5)
+hist(ourdata2[,2],breaks=seq(0,70,by=5),col=rgb(0,0,1,0.5),add=T)
+
+hist(ourdata[,4],breaks=seq(30,240,by=15),col=rgb(1,0,0,0.5),main="",xlab="Segregating Sites",xlim=c(30,240),cex.axis=1.75,cex.lab=1.5)
+hist(ourdata2[,4],breaks=seq(30,240,by=15),col=rgb(0,0,1,0.5),add=T)
+
+hist(ourdata[,6],breaks=seq(-2.5,3.5,by=0.5),col=rgb(1,0,0,0.5),main="",xlab="Tajima's D",cex.axis=1.75,cex.lab=1.5)
+hist(ourdata2[,6],breaks=seq(-2.5,3.5,by=0.5),col=rgb(0,0,1,0.5),add=T)
+legend("topright",legend=c("Theta = 12","Theta = 24"),fill=c(rgb(1,0,0,0.5),rgb(0,0,1,0.5)),cex=2)
+```
+
+From these plots we see that both $\pi$ and the number of segregating sites increase significantly with the doubled $\theta$ value, but that Tajima's D remains unchanged. 
+
+**Questions** 
+
+Why doesn't Tajima's D increase when we double $\theta$ and both $ss$ and $\pi$ increase?
+
+Doubling $\theta$ from 12 to 24 could have three interpretations with respect to our sample or underlying population. What are they?
+
+If you had to guess the average number of variants observed in a single sample (singletons) in both scenarios, what would it be?
+
+
+-------------------------------------------------------------------------------------------------
+
+The script coalescent\_sfs.pl calculates the average site frequency spectrum given ms output. Let's run it for our two scenarios and see if our guesses were close. Because we piped our *ms* output through *sample\_stats* we need to rerun the simulations and capture the actual coalescent output first.
+
+```
+echo 57000 44400 6650 > seedms
+ms 100 100 -t 12  > ms_output1.txt
+echo 57001 44400 6650 > seedms
+ms 100 100 -t 24 > ms_output2.txt
+perl coalescent_sfs.pl -f ms_output1.txt -o sfs_output1.txt
+perl coalescent_sfs.pl -f ms_output2.txt -o sfs_output2.txt
+```
+
+Check your previous answer with the `head` command on the 2 SFS files. 
+
+And finally, let's plot the SFS to visualize the impact of doubling $\theta$
+
+```{r}
+dat1=read.table("sfs_output1.txt",head=T)
+dat2=read.table("sfs_output2.txt",head=T)
+
+newdat=mat.or.vec(50,2)
+dat[,1]=seq(1,25.5,by=0.5)
+for (i in 1:25) {
+  newdat[2*i-1,2] = dat1$AVG[i]
+  newdat[2*i,2] = dat2$AVG[i]
+}
+
+barplot(newdat[,2],col=c("dodgerblue","goldenrod"),ylab="Average Num Variants",xlab="Allele Count",names=c(1,rep("",7),5,rep("",9),10,rep("",9),15,rep("",9),20,rep("",9),25,""),cex.axis=1.5,cex.lab=1.5)
+
+```
+
+

@@ -1,0 +1,288 @@
+---
+title: "Incorporating growth, structure, and recombination into simulations"
+output: html_document
+---
+
+In the last lecture we learned about a lot of extensions to the coalescent. Here we will show how each is implemented in *ms*, and further explore how they alter simulated sample sequences.
+
+In this lab we will 
+
+- **Simulate recombination, population growth, and population structure in ms**
+- **Evaluate how each process alters the SFS and related sequence summary statistics**
+
+Recombination
+---------------
+
+In this lab we will simulate cross-over events as occurring uniformly across the locus that we are simulating. As with mutation, *ms* uses a compound parameter to set the recombination rate. If $r$ is the per-generation probability of a recombination event occurring between the ends of the locus being simulated, define $\rho = 4N_{(0)}r$, where $N_{(0)}$ is our population size. While mutation occurs along our simulated loci under the infinite sites assumption, recombination in *ms* follows a finite sites model, and requires users to specify the length (in bases) of the loci. The command becomes
+
+```
+ms #samples #reps -t theta -r rho #sites
+```
+
+Previously, we only used the mutation parameter $\theta$ in our simulations, and each $\theta$ value was consistent with many combinations of population size, mutation rate, and locus length. When $\rho$ is added, locus length must be set in *ms*. However, $(\theta,\rho)$ pairs are still consistent with multiple combinations of mutation rate, recombination rate, and population size, with the condition that once any two are chosen, the last becomes fixed.
+
+To simulate a 10kb locus in 50 samples drawn from a population of size 20,000 with equal per-base mutation and recombination rates of $1.5 \times 10^-8$ we would use the command
+
+```
+ms 50 10000 -t 12 -r 12 10000 > ms_lab3_example1.txt
+```
+
+With recombination in the model, mutation locations along the haplotype now matter. If we look at an example tree, the line labeled "positions", now takes on new meaning. The probability that a recombination occurs between variants that are further apart is much higher than between close variant sites.
+
+```
+//
+segsites: 37
+positions: 0.0157 0.0159 0.0709 0.0816 0.1938 0.2093 0.2486 0.2674 0.2696 0.2730 0.2856 0.3186 0.3297 0.3548 0.3677 0.3913 0.3968 0.4149 0.4453 0.5171 0.5203 0.5383 0.5612 0.6527 0.6572 0.6707 0.7311 0.7334 0.7915 0.7929 0.7929 0.8347 0.9402 0.9424 0.9441 0.9899 0.9953 
+0000010000000000000011100000000000010
+0100001000110000000000000001010100000
+...
+...
+```
+
+Let's explore how else recombination changes simulation output. Simulate a comparison dataset and calculate the SFS for each.
+
+```
+ms 50 10000 -t 12 > ms_lab3_example2.txt
+perl coalescent_sfs.pl -f ms_lab3_example1.txt -o example1_sfs.txt
+perl coalescent_sfs.pl -f ms_lab3_example2.txt -o example2_sfs.txt
+```
+
+We can inspect the first 9 elements of each SFS using `head example1_sfs.txt` and `head example2_sfs.txt`, or visualize the entire spectrum in a histogram.
+
+```{r fig.width=11.5}
+par(mfrow=c(1,1),mgp=c(3,0.5,0))
+dat1=read.table("example1_sfs.txt",head=T)
+dat2=read.table("example2_sfs.txt",head=T)
+
+newdat=mat.or.vec(98,1)
+for (i in 1:49) {
+  newdat[2*i-1] = dat1$AVG[i]
+  newdat[2*i] = dat2$AVG[i]
+}
+
+barplot(newdat,col=c("dodgerblue","black"),cex.axis=1.5,cex.names=1.5,cex.lab=1.5,ylab="Expected Number of variants",xlab="Allele Count",las=2,names.arg=c("",1,rep("",17),10,rep("",29),25,rep("",47),49))
+
+```
+
+
+From either approach we see that recombination does not change the expected number of variants with each minor allele count in our sample. When we weight each branch length by the amount of ancestral sequence present (0 to 1), the total length of a coalescent tree does not change when recombination is added to the model. However, when we plot the standard deviation of our allele counts:
+
+```{r fig.width=11.5}
+
+newdat2=mat.or.vec(98,1)
+for (i in 1:49) {
+  newdat2[2*i-1] = dat1$SD[i]
+  newdat2[2*i] = dat2$SD[i]
+}
+
+barplot(newdat2,col=c("dodgerblue","black"),cex.axis=1.5,cex.names=1.5,cex.lab=1.5,ylab="Standard Deviation",xlab="Allele Count",las=2,names.arg=c("",1,rep("",17),10,rep("",29),25,rep("",47),49))
+
+```
+
+Adding recombination reduces the variance in the average number of observed alleles with any given count. The ARG for a sequence contains multiple sub-graphs for each non-recombining segment present. In some ways these act as multiple genealogies, and our SFS results from all of these and behaves like an average over several trees, reducing the variance between independent realizations.
+
+Generally, the assumption of uniform recombination across a locus is reasonable. However, for some applications and questions the recombination landscape of the simulated data is very important. The program *msHOT* is also available from Dick Hudson's website (http://home.uchicago.edu/~rhudson1/), and allows users to specify recombination and gene conversion hotspots in a very similar framework to *ms*.
+
+**Questions**
+
+Below are three realized coalescent simulations. Which simulations must have included a recombination event(s) to explain the sample haplotypes?
+
+```
+//
+segsites: 5
+positions: 0.5915 0.6343 0.6788 0.9238 0.9742 
+01010
+01010
+01011
+10101
+01010
+01010
+
+//
+segsites: 9
+positions: 0.2039 0.2208 0.7308 0.7312 0.7966 0.9046 0.9460 0.9481 0.9760 
+000010001
+000001110
+011010000
+100110000
+100110000
+000001110
+
+//
+segsites: 13
+positions: 0.0193 0.1768 0.2155 0.2201 0.3726 0.4834 0.6572 0.7262 0.7978 0.8119 0.8306 0.8938 0.8953 
+0111011010001
+0111110001110
+0111011010001
+1000000010001
+0111010101110
+1000000010010
+```
+
+If we wanted to simulate samples using a recombination rate of 1 centamorgan/megabase, a mutation rate of $1.4 \times 10^{-8}$ per base/per generation, and a population size of 25,000 haploids, what $\theta$ and $\rho$ values would we use?
+
+-------------------------------------------------------------------------------------------------
+
+Population growth
+---------------
+
+*ms* allows for both instantaneous population size changes and exponential growth. Instant size changes are controlled with the `-eN` swith followed by two values: the time of the change (in coalescent units of $4N$ generations) and the ratio $N_{(t)}/N_{(0)}$ that gives the new population size relative to the original population size. Exponential growth is first entered with the `-G` switch, and subsequently modified with the `-eG` switch. `-G` is followed by the initial exponential growth rate (scaled in units of $4N$ generations), `-eG` is followed by the time that the growth rate changes, and then the new scaled exponential growth rate. To end growth at time $t$, one includes the switch `-eG t 0`. Both `-eN` and `-eG` can be entered multiple times
+
+All growth rates are relative to the initial population size $N_{(0)}$, which is also the value used to scale time. An exponential growth rate, $\alpha$ is calculated as $N_{(t)} = N_{(0)} e^{-\alpha t}$, where $t$ is in units of $4N_{(0)}$ generations. If a negative $\alpha$ value is entered the population being modeled was larger in the past and has shrunk at an exponential rate. 
+
+As an example, if we wanted to simulate 100 samples from a population that grew from 25,000 haploids to 100,000 over the past 1,000 generations, and was constant in size before that except for a bottleneck where it was comprised of only 5,000 haploids for 100 generations between 2,000 and 2,100 generations ago (mutation rate = $1.5 \times 10^{-8}$, 10kb locus), we would use the command 
+
+```
+ms 100 1 -t 60 -G 554.518 -eG .0025 0 -eN 0.005 0.05 -eN .00525 1
+```
+
+Two additional important items are that the `-eN` switch sets the exponential growth rate to 0 at the time that the population size change occurs and that *ms* processes simultaneous events from left to right along the command line. So, if you want to model a population that is shrinking at rate $\alpha$, undergoes a sudden change to half its original size at time $t$, but continues shrinking with rate $\alpha$, it needs to be entered as 
+
+```
+ms samples reps -t theta -G alpha -eN t 0.5 -eG t alpha     #Correct
+```
+not as 
+
+```
+ms samples reps -t theta -G alpha -eG t alpha -eN t 0.5     #Incorrect
+```
+
+In the last lecture we saw how recent growth increased the quantity and proportion of variants with low minor allele counts in a sample. Next, let's evaluate how the statistic Tajima's D, meant to detect departures from the neutral Wright-Fisher model, behaves with samples from populations that have undergone growth. Calculate Tajima's D using the program *sample_stats* like we did previously, only this time under a model of rapid population growth.
+
+```
+ms 250 100 -t 60 -G 3684.14 -eG 0.00125 0 | sample_stats > example3_sstats.txt
+```
+
+```{r fig.width=11.5}
+dat3=read.table("example3_sstats.txt",head=F)
+
+hist(dat3[,6],breaks=25,col="red3",main="Tajima's D",xlab="Tajima's D",cex.lab=1.5)
+```
+
+
+**Questions**
+
+What strong pattern do we observe in the plot of Tajima's D from our model with population growth? If we were to reject that our sequence evolved under a neutral model when Tajima's D is $> \mid 2 \mid$, for the simulations above we would reject $26/100$ times (because we did not all use the same random seed, your number will likely be different but should be similar). In reality $100/100$ simulations violated the neutral assumption. What does this tell you about Tajima's D under the conditions we simulated? 
+
+If we assume a mutation rate of $1.5 \times 10^{-8}$ and a 10kb locus, what were the growth parameters we simulated under?
+
+Simulate a larger sample
+```
+ms 2500 100 -t 60 -G 3684.14 -eG 0.00125 0 | sample_stats > example4_sstats.txt
+```
+
+With the larger sample how often do you reject the hypothesis that our sequences evolved under a neutral model using Tajima's D? What does this imply about sample size and our ability to detect recent population growth?
+
+-------------------------------------------------------------------------------------------------
+`
+Population structure
+---------------
+
+The space of structure models that can be simulated using *ms* is very broad, and includes the simple island, the divergence, and the stepping stone models. Structure is entered using the `-I` switch, followed by the number of demes,  and the number of samples in each deme (at time 0). A migration rate can be entered after the last deme. If $m$ is the proportion of individuals from each deme that migrate/emigrate each generation, then *ms* uses the scaled migration parameter $M = 4N_{(0)}m$. Here $N_{(0)}$ refers to the size of the first deme, in a structured model *ms* scales everything to the first deme size, and if individual deme sizes are not specified the total population size is $dN_{(0)}$ where $d$ is the number of demes. 
+
+If no migration rate is entered, it is assumed to be 0. If the migration rate is entered as 0, additional demographic parameters are required (e.g. individual deme migration parameters, non-zero migration in the past, population mergers), otherwise samples will not share common ancestors. So a simple island model, where all demes have the same size and migration is symmetric between them can be simulated using the command: 
+
+```
+ms samples reps -t theta -I demes samples_deme_1 samples_deme_2 ... samples_deme_n M
+```
+
+In the output, the haplotypes are ordered by deme. If you simulate 15 haplotypes, 3 each from 5 total demes (`-I 5 3 3 3 3 3`), the first three haplotypes in each output tree will be from deme 1, the second 3 from deme 2, etc...
+
+For more complex models, deme specific parameters can be specified. *ms* simulates migration according to a migration matrix. This matrix is $d \times d$, and element $(i,j)$ gives fraction of deme $i$ made up of migrants from deme $j$ each generation. In the case of the simple island model, where a single $M$ value is given, each off-diagonal element of this matrix is set to $\frac{M}{d-1}$. Diagonal elements are not used by the program, and their values do not matter. Individual elements of the migration matrix can be set using the `-m` switch. After using `-I` to set the number and sample configuration between demes, `-m i j M_ij` will set migration matrix element $(i,j)$ to $M_{i j}$, and can be used repeatedly. If more than a few elements of the matrix need to be defined, the `-ma` option allows one to specify the entire migration matrix. If we wanted to simulate a model with 3 demes, where the first 2 exchange many more migrants with each other than either with the third deme, such that the migration matrix has the form
+
+```{r fig.width=1.5, fig.height=1.65,echo=FALSE}
+library(png)
+library(grid)
+img <- readPNG("/home/mreppell/Documents/Dordt/Figures/figure40.png")
+ grid.raster(img)
+```
+
+We can simulate this scenerio using
+
+```
+ms 12 10 -t 1 -I 3 4 4 4 -ma x 20 .25 20 x .25 .25 .25 x > ms_lab3_example5.txt  
+```
+
+Look at the first few trees in this file.
+
+```
+//
+segsites: 10
+positions: 0.0490 0.2276 0.5027 0.5209 0.5325 0.5660 0.6456 0.7295 0.8359 0.9207 
+0101010011
+0010101000
+0101010011
+0101010001
+0101010011
+0101010011
+1101010001
+1101010001
+0000000100
+0000000100
+0000000100
+0000000100
+```
+
+In many realizations we can see how similar the samples from the first 2 demes are (haplotypes 1-8), while the final 4 haplotypes cluster together separately.
+
+After setting the initial demographic parameters, all the values can be changed with a series of `-e` switches. From the *ms* user guide, possible changes include
+
+---------------------------------------------------
+Switch                     Description
+-------------------------- ------------------------
+-eG $t$ $\alpha$           Set growth rates in all demes to $\alpha$ at time $t$
+
+-eg $t$ $i$ $\alpha_{i}$   Set growth rate of deme $i$ to $\alpha_{i}$ at time $t$
+
+-eN $t$ $x$                Set all demes size to $x \times N_{(0)}$ and growth rates to 0 at time $t$
+
+-en $t$ $i$ $x$            Set deme $i$ size to $x \times N_{(0)}$ and growth rate to 0 at time $t$ 
+
+-em $t$ $i$ $j$ $x$        Set $M_{i j} = 4N_{(0)}m_{i j}$ to $x$ at time $t$, where $m_{i j}$ is the
+                           proportion of deme $i$ made up of migrants from deme $j$ each generation
+                        
+-ema $t$ $d$ M_11 ...    Assign new values to all elements of the migration matrix
+
+-es $t$ $i$ $p$            Split deme $i$ into two demes, with samples present at time of split assigned
+                           to deme $i$ with probability $p$, and the new deme, labeled $n+1$ with probability
+                           $(1-p)$. New deme has size $N_{(0)}$ and migration rate 0, while the size,
+                           growth rate, and migration rates of deme $i$ do not change. This event
+                           simulates admixture.
+
+-ej $t$ $i$ $j$            Move all samples in deme $i$ to deme $j$ and set migration rate for deme $i$ to 0. 
+                           This corresponds to demes merging in the past (splitting going forward in time).                       
+---------------------------------------------------                           
+
+Remember that all times are scaled in terms of $4N_{(0)}$ where $N_{(0)}$ is the initial size of deme 1. 
+
+Let's simulate a divergence model and plot the SFS.
+
+```
+ms 50 1000. -t 12 -I 2 35 15 -ej 0.5 2 1 > ms_lab3_example6.txt
+perl coalescent_sfs.pl -f ms_lab3_example6.txt -o example6_sfs.txt
+```
+
+```{r fig.width=11.5}
+dat4 = read.table("example6_sfs.txt",head=T)
+barplot(dat4$AVG[1:49],col="purple",cex.axis=1.5,cex.names=1.5,cex.lab=1.5,ylab="Average Number of variants",xlab="Allele Count",las=2,names.arg=c(1,rep("",3),5,rep("",4),10,rep("",4),15,rep("",4),20,rep("",4),25,rep("",4),30,rep("",4),35,rep("",4),40,rep("",4),45,rep("",3),49))
+```
+
+**Questions**
+
+Describe the demographic model simulated for `ms_lab3_example6.txt`. What accounts for the spikes at derived allele counts 15 and 35 in the figure above? 
+
+If we wanted to simulate samples under a stepping stone model, how would we format the migration matrix? 
+
+
+We can combine all the previous sections and simulate data with recombination, population growth, and population structure all present. Draw a diagram describing the following demographic history:
+
+```
+ms 50 1000 -t 18 -r 12 15000 -I 10 10 10 10 10 10 0 0 0 0 0 24 -en 0 2 1.5 -G 22.18071 -eg 0.03125 1 0 -eg 0.049535 2 0 
+```
+
+
+
+
+
+
+
